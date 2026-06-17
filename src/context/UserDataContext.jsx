@@ -129,6 +129,32 @@ export function UserDataProvider({ children }) {
     [obraIndex, userId],
   )
 
+  // ========================================================================
+  // 🧬 IMPLEMENTAÇÃO PRÁTICA DO PADRÃO PROTOTYPE 
+  // ========================================================================
+  const duplicarObraPersonalizada = useCallback((obraOriginal, novoTitulo) => {
+    if (!obraOriginal || typeof obraOriginal.clone !== 'function') {
+      throw new Error('A obra fornecida não suporta o padrão Prototype (método clone não encontrado).')
+    }
+
+    // 1. O Prototype em ação: clonamos a obra inteira sem nos acoplarmos à sua classe concreta.
+    const obraClonada = obraOriginal.clone()
+    
+    // 2. Alteramos apenas as propriedades exclusivas do clone
+    obraClonada.id = obraClonada.id + '_custom_' + Math.random().toString(36).slice(2, 8)
+    if (novoTitulo) {
+      obraClonada.titulo = novoTitulo
+    }
+
+    // 3. Salvamos a nova variante no nosso banco de dados local
+    registrarObraNoIndice(obraClonada)
+    
+    // Disparamos o Observer para avisar a interface visual
+    appEvents.notificar('OBRA_CLONADA', { original: obraOriginal.titulo, clone: obraClonada.titulo })
+
+    return obraClonada
+  }, [registrarObraNoIndice])
+
   /* Diário / Avaliações */
   const registrarLog = useCallback(
     (obra, { dataVisualizacao, nota = 0, resenha = '', curtido = false, baseadoEmId = null }) => {
@@ -444,7 +470,7 @@ export function UserDataProvider({ children }) {
   const api = useMemo(
     () => ({
       diary, lists, watchlist, watchedEpisodes, follows, obraIndex,
-      registrarObraNoIndice, obterObraDoIndice,
+      registrarObraNoIndice, obterObraDoIndice, duplicarObraPersonalizada, // 👈 INSERIDO AQUI
       registrarLog, editarLog, excluirLog, listarDiarioDoUsuario,
       criarLista, atualizarLista, excluirLista, adicionarItemNaLista, removerItemDaLista, reordenarLista, listarListasDoUsuario,
       estaNaWatchlist, alternarWatchlist,
@@ -455,7 +481,7 @@ export function UserDataProvider({ children }) {
     }),
     [
       diary, lists, watchlist, watchedEpisodes, follows, obraIndex,
-      registrarObraNoIndice, obterObraDoIndice,
+      registrarObraNoIndice, obterObraDoIndice, duplicarObraPersonalizada, // 👈 INSERIDO AQUI
       registrarLog, editarLog, excluirLog, listarDiarioDoUsuario,
       criarLista, atualizarLista, excluirLista, adicionarItemNaLista, removerItemDaLista, reordenarLista, listarListasDoUsuario,
       estaNaWatchlist, alternarWatchlist,

@@ -26,7 +26,7 @@ export default class Obra {
   clone() {
     return new this.constructor({
       ...this,
-      // Clonagem profunda de arrays para evitar referências compartilhadas na memória 🧠
+      // Clonagem profunda de arrays para evitar referências compartilhadas na memória
       generos: this.generos ? [...this.generos] : [],
       diretores: this.diretores ? [...this.diretores] : undefined,
       criadores: this.criadores ? [...this.criadores] : undefined
@@ -34,7 +34,7 @@ export default class Obra {
   }
 
   // ========================================================================
-  // 🌳 PADRÃO COMPOSITE: Interface de Árvore (Component)
+  // PADRÃO COMPOSITE: Interface de Árvore (Component)
   // ========================================================================
 
   /** * Composite: Adiciona um componente filho (ex: Episódio dentro de Temporada).
