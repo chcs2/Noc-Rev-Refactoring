@@ -10,25 +10,6 @@ import { load, save, userScoped } from '../utils/storage.js'
 import { useAuth } from './AuthContext.jsx'
 import { obraDeIndice } from '../domain/factory.js'
 
-/**
- * UserDataContext — coração da camada de dados do NocRev.
- *
- * Concentra os dados de todos os usuários (mock, em localStorage) e expõe
- * uma API uniforme para as funcionalidades:
- *  - Sistema de Avaliação e Diário (req. 3.1.2)
- *  - Criação de Listas (req. 3.1.3)
- *  - Interação Social: seguir, curtir reviews, comentar em listas (req. 3.1.4)
- *  - Sistema de Progresso Flexível (req. 3.2.2)
- *  - Listas Mistas (req. 3.2.4)
- *  - Suporte aos cálculos de Estatísticas (req. 3.2.5) e Streaks (req. 3.2.6)
- *
- * Particionamento dos dados:
- *  - Cada usuário tem o seu próprio diário, listas, follows, review-likes,
- *    list-comments, watchlist, episódios vistos.
- *  - Existe um índice GLOBAL de obras (`obraIndex`) com todos os metadados
- *    serializados, para reconstruir as instâncias polimórficas de Obra.
- */
-
 const UserDataContext = createContext(null)
 
 function loadUser(userId, key, fallback) {
@@ -75,32 +56,15 @@ export function UserDataProvider({ children }) {
     setListComments(loadUser(userId, 'listComments', {}))
   }, [userId])
 
-  // IMPORTANTE: nunca retorne valores não-undefined dessas effects.
-  // Um arrow `() => userId && saveUser(...)` retorna `null` quando userId é null,
-  // e o React 18 tenta chamar esse `null` como função de cleanup e quebra.
-  useEffect(() => {
-    if (userId) saveUser(userId, 'diary', diary)
-  }, [userId, diary])
-  useEffect(() => {
-    if (userId) saveUser(userId, 'lists', lists)
-  }, [userId, lists])
-  useEffect(() => {
-    if (userId) saveUser(userId, 'watchlist', watchlist)
-  }, [userId, watchlist])
-  useEffect(() => {
-    if (userId) saveUser(userId, 'watchedEpisodes', watchedEpisodes)
-  }, [userId, watchedEpisodes])
-  useEffect(() => {
-    if (userId) saveUser(userId, 'follows', follows)
-  }, [userId, follows])
-  useEffect(() => {
-    if (userId) saveUser(userId, 'reviewLikes', reviewLikes)
-  }, [userId, reviewLikes])
-  useEffect(() => {
-    if (userId) saveUser(userId, 'listComments', listComments)
-  }, [userId, listComments])
+  useEffect(() => { if (userId) saveUser(userId, 'diary', diary) }, [userId, diary])
+  useEffect(() => { if (userId) saveUser(userId, 'lists', lists) }, [userId, lists])
+  useEffect(() => { if (userId) saveUser(userId, 'watchlist', watchlist) }, [userId, watchlist])
+  useEffect(() => { if (userId) saveUser(userId, 'watchedEpisodes', watchedEpisodes) }, [userId, watchedEpisodes])
+  useEffect(() => { if (userId) saveUser(userId, 'follows', follows) }, [userId, follows])
+  useEffect(() => { if (userId) saveUser(userId, 'reviewLikes', reviewLikes) }, [userId, reviewLikes])
+  useEffect(() => { if (userId) saveUser(userId, 'listComments', listComments) }, [userId, listComments])
 
-  /* Índice de Obras (Modelagem Universal — req. 3.2.1) */
+  /* Índice de Obras (Modelagem Universal) */
   const registrarObraNoIndice = useCallback((obra) => {
     if (!obra) return
     const chave = obra.getIdentificadorUnico()
@@ -112,7 +76,7 @@ export function UserDataProvider({ children }) {
     [obraIndex],
   )
 
-  /* Diário / Avaliações (req. 3.1.2) */
+  /* Diário / Avaliações */
   const registrarLog = useCallback(
     (obra, { dataVisualizacao, nota = 0, resenha = '', curtido = false, baseadoEmId = null }) => {
       if (!userId) throw new Error('Faça login para registrar no diário.')
@@ -125,7 +89,6 @@ export function UserDataProvider({ children }) {
         nota,
         resenha,
         curtido,
-        // 🧬 Rastreio do Padrão Prototype: Guarda o ID do log original caso seja uma nova revisão
         baseadoEmId, 
         criadoEm: Date.now(),
       }
@@ -158,22 +121,25 @@ export function UserDataProvider({ children }) {
       if (!id) return []
       return id === userId ? diary : loadUser(id, 'diary', [])
     },
-    [userId, diary, dataVersion], // eslint-disable-line react-hooks/exhaustive-deps
+    [userId, diary, dataVersion], 
   )
 
-  /* Listas (req. 3.1.3 + 3.2.4 Listas Mistas) */
+  /* Listas */
   const criarLista = useCallback(
-    ({ nome, descricao = '', visibilidade = 'publica' }) => {
+    ({ nome, descricao = '', visibilidade = 'publica', itens = [] }) => {
       if (!userId) throw new Error('Faça login para criar listas.')
-      const lista = {
-        id: 'lst_' + Math.random().toString(36).slice(2, 10),
-        nome,
-        descricao,
-        visibilidade,
-        itens: [],
-        criadoEm: Date.now(),
-        atualizadoEm: Date.now(),
+      
+      // ✨ CORREÇÃO: itens agora é recebido por parâmetro e clonado [...itens]
+      const lista = { 
+        id: 'lst_' + Math.random().toString(36).slice(2, 10), 
+        nome, 
+        descricao, 
+        visibilidade, 
+        itens: [...itens], 
+        criadoEm: Date.now(), 
+        atualizadoEm: Date.now() 
       }
+      
       setLists((prev) => [lista, ...prev])
       return lista
     },
@@ -181,9 +147,7 @@ export function UserDataProvider({ children }) {
   )
 
   const atualizarLista = useCallback((listId, patch) => {
-    setLists((prev) =>
-      prev.map((l) => (l.id === listId ? { ...l, ...patch, atualizadoEm: Date.now() } : l)),
-    )
+    setLists((prev) => prev.map((l) => (l.id === listId ? { ...l, ...patch, atualizadoEm: Date.now() } : l)))
   }, [])
 
   const excluirLista = useCallback((listId) => {
@@ -206,19 +170,11 @@ export function UserDataProvider({ children }) {
   )
 
   const removerItemDaLista = useCallback((listId, chave) => {
-    setLists((prev) =>
-      prev.map((l) =>
-        l.id === listId
-          ? { ...l, itens: l.itens.filter((k) => k !== chave), atualizadoEm: Date.now() }
-          : l,
-      ),
-    )
+    setLists((prev) => prev.map((l) => l.id === listId ? { ...l, itens: l.itens.filter((k) => k !== chave), atualizadoEm: Date.now() } : l))
   }, [])
 
   const reordenarLista = useCallback((listId, novaOrdem) => {
-    setLists((prev) =>
-      prev.map((l) => (l.id === listId ? { ...l, itens: novaOrdem, atualizadoEm: Date.now() } : l)),
-    )
+    setLists((prev) => prev.map((l) => (l.id === listId ? { ...l, itens: novaOrdem, atualizadoEm: Date.now() } : l)))
   }, [])
 
   const listarListasDoUsuario = useCallback(
@@ -227,10 +183,10 @@ export function UserDataProvider({ children }) {
       if (!id) return []
       return id === userId ? lists : loadUser(id, 'lists', [])
     },
-    [userId, lists, dataVersion], // eslint-disable-line react-hooks/exhaustive-deps
+    [userId, lists, dataVersion], 
   )
 
-  /* Watchlist (lista especial "Para Assistir") */
+  /* Watchlist */
   const estaNaWatchlist = useCallback(
     (obra) => Boolean(watchlist[obra.getIdentificadorUnico()]),
     [watchlist],
@@ -250,24 +206,31 @@ export function UserDataProvider({ children }) {
     [registrarObraNoIndice],
   )
 
-  /* Episódios vistos (Sistema de Progresso Flexível — req. 3.2.2) */
+  // INTEGRAÇÃO COM O PADRÃO COMPOSITE (Progresso Flexível)
   const episodioVisto = useCallback(
-    (episodio) => Boolean(watchedEpisodes[episodio.getIdentificadorUnico()]),
+    (episodio) => {
+      if (episodio.isVisto()) return true
+      return Boolean(watchedEpisodes[episodio.getIdentificadorUnico()])
+    },
     [watchedEpisodes],
   )
 
   const alternarEpisodioVisto = useCallback(
     (episodio) => {
-      registrarObraNoIndice(episodio)
       const chave = episodio.getIdentificadorUnico()
+      const estavaVisto = episodio.isVisto() || Boolean(watchedEpisodes[chave])
+      
+      episodio.setVisto(!estavaVisto)
+      registrarObraNoIndice(episodio)
+      
       setWatchedEpisodes((prev) => {
         const next = { ...prev }
-        if (next[chave]) delete next[chave]
+        if (estavaVisto) delete next[chave]
         else next[chave] = Date.now()
         return next
       })
     },
-    [registrarObraNoIndice],
+    [watchedEpisodes, registrarObraNoIndice],
   )
 
   const contarEpisodiosVistosDaSerie = useCallback(
@@ -279,20 +242,35 @@ export function UserDataProvider({ children }) {
   )
 
   const marcarSerieInteiraVista = useCallback(
-    (todosEpisodios) => {
+    (serieArvore) => {
+      serieArvore.setVisto(true)
+
+      const salvarRecursivo = (obra) => {
+        registrarObraNoIndice(obra)
+        if (typeof obra.getFilhos === 'function') {
+          obra.getFilhos().forEach(salvarRecursivo)
+        }
+      }
+      salvarRecursivo(serieArvore)
+
       setWatchedEpisodes((prev) => {
         const novos = { ...prev }
-        for (const ep of todosEpisodios) {
-          novos[ep.getIdentificadorUnico()] = Date.now()
-          registrarObraNoIndice(ep)
+        const preencherIds = (obra) => {
+          if (obra.getTipo() === 'Episódio') {
+            novos[obra.getIdentificadorUnico()] = Date.now()
+          }
+          if (typeof obra.getFilhos === 'function') {
+            obra.getFilhos().forEach(preencherIds)
+          }
         }
+        preencherIds(serieArvore)
         return novos
       })
     },
     [registrarObraNoIndice],
   )
 
-  /* Social — follows, review-likes, comentários (req. 3.1.4) */
+  // Social
   const seguir = useCallback(
     (alvoId) => {
       if (!userId || alvoId === userId) return
@@ -337,23 +315,15 @@ export function UserDataProvider({ children }) {
       }
       return total
     },
-    [userId, reviewLikes, dataVersion], // eslint-disable-line react-hooks/exhaustive-deps
+    [userId, reviewLikes, dataVersion], 
   )
 
   const comentarEmLista = useCallback(
     (listAuthorId, listId, texto) => {
       if (!userId) throw new Error('Faça login para comentar.')
       const chave = `${listAuthorId}/${listId}`
-      const comentario = {
-        id: 'c_' + Math.random().toString(36).slice(2, 10),
-        autorId: userId,
-        texto,
-        criadoEm: Date.now(),
-      }
-      setListComments((prev) => ({
-        ...prev,
-        [chave]: [...(prev[chave] || []), comentario],
-      }))
+      const comentario = { id: 'c_' + Math.random().toString(36).slice(2, 10), autorId: userId, texto, criadoEm: Date.now() }
+      setListComments((prev) => ({ ...prev, [chave]: [...(prev[chave] || []), comentario] }))
       setDataVersion((v) => v + 1)
     },
     [userId],
@@ -364,9 +334,7 @@ export function UserDataProvider({ children }) {
       const chave = `${listAuthorId}/${listId}`
       setListComments((prev) => ({
         ...prev,
-        [chave]: (prev[chave] || []).map((c) =>
-          c.id === comentarioId ? { ...c, texto: novoTexto, editadoEm: Date.now() } : c,
-        ),
+        [chave]: (prev[chave] || []).map((c) => c.id === comentarioId ? { ...c, texto: novoTexto, editadoEm: Date.now() } : c),
       }))
     },
     [],
@@ -375,10 +343,7 @@ export function UserDataProvider({ children }) {
   const excluirComentarioLista = useCallback(
     (listAuthorId, listId, comentarioId) => {
       const chave = `${listAuthorId}/${listId}`
-      setListComments((prev) => ({
-        ...prev,
-        [chave]: (prev[chave] || []).filter((c) => c.id !== comentarioId),
-      }))
+      setListComments((prev) => ({ ...prev, [chave]: (prev[chave] || []).filter((c) => c.id !== comentarioId) }))
     },
     [],
   )
@@ -395,63 +360,28 @@ export function UserDataProvider({ children }) {
       acumulador.sort((a, b) => a.criadoEm - b.criadoEm)
       return acumulador
     },
-    [userId, listComments, dataVersion], // eslint-disable-line react-hooks/exhaustive-deps
+    [userId, listComments, dataVersion], 
   )
 
   const recarregarDadosCruzados = useCallback(() => setDataVersion((v) => v + 1), [])
 
   const api = useMemo(
     () => ({
-      diary,
-      lists,
-      watchlist,
-      watchedEpisodes,
-      follows,
-      obraIndex,
-
-      registrarObraNoIndice,
-      obterObraDoIndice,
-
-      registrarLog,
-      editarLog,
-      excluirLog,
-      listarDiarioDoUsuario,
-
-      criarLista,
-      atualizarLista,
-      excluirLista,
-      adicionarItemNaLista,
-      removerItemDaLista,
-      reordenarLista,
-      listarListasDoUsuario,
-
-      estaNaWatchlist,
-      alternarWatchlist,
-
-      episodioVisto,
-      alternarEpisodioVisto,
-      contarEpisodiosVistosDaSerie,
-      marcarSerieInteiraVista,
-
-      seguir,
-      deixarDeSeguir,
-      estaSeguindo,
-      curtirReview,
-      reviewCurtido,
-      contarLikesReview,
-      comentarEmLista,
-      editarComentarioLista,
-      excluirComentarioLista,
-      listarComentariosDeLista,
-
+      diary, lists, watchlist, watchedEpisodes, follows, obraIndex,
+      registrarObraNoIndice, obterObraDoIndice,
+      registrarLog, editarLog, excluirLog, listarDiarioDoUsuario,
+      criarLista, atualizarLista, excluirLista, adicionarItemNaLista, removerItemDaLista, reordenarLista, listarListasDoUsuario,
+      estaNaWatchlist, alternarWatchlist,
+      episodioVisto, alternarEpisodioVisto, contarEpisodiosVistosDaSerie, marcarSerieInteiraVista,
+      seguir, deixarDeSeguir, estaSeguindo, curtirReview, reviewCurtido, contarLikesReview,
+      comentarEmLista, editarComentarioLista, excluirComentarioLista, listarComentariosDeLista,
       recarregarDadosCruzados,
     }),
     [
       diary, lists, watchlist, watchedEpisodes, follows, obraIndex,
       registrarObraNoIndice, obterObraDoIndice,
       registrarLog, editarLog, excluirLog, listarDiarioDoUsuario,
-      criarLista, atualizarLista, excluirLista,
-      adicionarItemNaLista, removerItemDaLista, reordenarLista, listarListasDoUsuario,
+      criarLista, atualizarLista, excluirLista, adicionarItemNaLista, removerItemDaLista, reordenarLista, listarListasDoUsuario,
       estaNaWatchlist, alternarWatchlist,
       episodioVisto, alternarEpisodioVisto, contarEpisodiosVistosDaSerie, marcarSerieInteiraVista,
       seguir, deixarDeSeguir, estaSeguindo, curtirReview, reviewCurtido, contarLikesReview,

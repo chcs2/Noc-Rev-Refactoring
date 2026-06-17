@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { tmdb, posterUrl } from '../api/tmdb.js'
-import { obraDeSerieTmdb, obraDeEpisodioTmdb } from '../domain/factory.js'
+import { montarArvoreCompositeSerie } from '../domain/factory.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useUserData } from '../context/UserDataContext.jsx'
 import LogEntryForm from '../components/LogEntryForm.jsx'
@@ -9,23 +9,21 @@ import AdicionarALista from '../components/AdicionarALista.jsx'
 
 /**
  * Página de detalhe de Série/Minissérie — implementa o Sistema de Progresso
- * Flexível (req. 3.2.2):
- *  - Marcar a série inteira como vista de uma vez
- *  - Marcar episódios individualmente
- *  - Mostrar barra de % concluído
+ * Flexível (req. 3.2.2).
+ * * 🌳 REFATORAÇÃO COMPOSITE: Este componente agora é 100% dependente da árvore de
+ * domínio. Em vez de lidar com JSONs brutos do TMDB para cada temporada, ele 
+ * delega as responsabilidades estruturais e de estado para a hierarquia Serie -> Temporada -> Episodio.
  */
 export default function SerieDetail() {
   const { id } = useParams()
   const serieId = Number(id)
-  const [obra, setObra] = useState(null)
+  
+  // O estado 'obra' agora guardará o Nó Raiz (Composite) com a árvore completa
+  const [obra, setObra] = useState(null) 
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [openSeason, setOpenSeason] = useState(null)
-  const [seasonCache, setSeasonCache] = useState({})
-  const [seasonsRaw, setSeasonsRaw] = useState([])
   const [mostrandoLog, setMostrandoLog] = useState(false)
-
-  // ✨ Estado para controlar a caixa de aviso customizada no meio da tela
   const [notificacao, setNotificacao] = useState(null)
 
   const { autenticado } = useAuth()
@@ -33,14 +31,11 @@ export default function SerieDetail() {
     registrarLog,
     estaNaWatchlist,
     alternarWatchlist,
-    episodioVisto,
-    alternarEpisodioVisto,
     contarEpisodiosVistosDaSerie,
     marcarSerieInteiraVista,
     registrarObraNoIndice,
   } = useUserData()
 
-  // Timer para sumir com o aviso automaticamente após 3 segundos
   useEffect(() => {
     if (notificacao) {
       const timer = setTimeout(() => setNotificacao(null), 3000)
@@ -52,117 +47,78 @@ export default function SerieDetail() {
     let cancelled = false
     setLoading(true)
     setError(null)
-    tmdb
-      .serie(serieId)
-      .then((data) => {
-        if (cancelled) return
-        const o = obraDeSerieTmdb(data)
-        setObra(o)
-        registrarObraNoIndice(o)
-        setSeasonsRaw(data.seasons || [])
-        const primeira = (data.seasons || []).find(
-          (s) => s.episode_count > 0 && s.season_number > 0,
-        )
-        if (primeira) setOpenSeason(primeira.season_number)
-      })
-      .catch((e) => !cancelled && setError(e.message))
-      .finally(() => !cancelled && setLoading(false))
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serieId])
 
-  useEffect(() => {
-    if (openSeason == null) return
-    if (seasonCache[openSeason]) return
-    let cancelled = false
-    tmdb
-      .temporada(serieId, openSeason)
-      .then((data) => {
+    // 1. Busca os dados base da Série
+    tmdb.serie(serieId)
+      .then(async (serieBruta) => {
         if (cancelled) return
-        setSeasonCache((prev) => ({ ...prev, [openSeason]: data }))
-        // Registra cada episódio no índice para reconstrução em listas/diário.
-        for (const ep of data.episodes || []) {
-          registrarObraNoIndice(
-            obraDeEpisodioTmdb(ep, { serieId, serieTitulo: obra?.titulo }),
+
+        // 2. Extrai quais temporadas existem para podermos buscar os episódios
+        const temporadasParaBuscar = (serieBruta.seasons || []).filter(s => s.season_number >= 0)
+
+        try {
+          // 3. Busca todas as temporadas paralelamente para construir a árvore
+          const temporadasComEpisodios = await Promise.all(
+            temporadasParaBuscar.map(s => tmdb.temporada(serieId, s.season_number))
           )
+
+          if (cancelled) return
+
+          // 🌳 A MÁGICA DO COMPOSITE: Montamos a árvore de uma vez só
+          const serieArvore = montarArvoreCompositeSerie(serieBruta, temporadasComEpisodios)
+
+          setObra(serieArvore)
+          registrarObraNoIndice(serieArvore)
+          
+          // Registra os episódios no índice (via recursão plana) para o diário funcionar solto
+          serieArvore.getFilhos().forEach(temporada => {
+            temporada.getFilhos().forEach(ep => registrarObraNoIndice(ep))
+          })
+
+          const primeira = temporadasParaBuscar.find(s => s.episode_count > 0 && s.season_number > 0)
+          if (primeira) setOpenSeason(primeira.season_number)
+
+        } catch (err) {
+          if (!cancelled) setError("Erro ao carregar os dados das temporadas.")
+        } finally {
+          if (!cancelled) setLoading(false)
         }
       })
       .catch((e) => !cancelled && setError(e.message))
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serieId, openSeason])
 
-  const totalEp = obra?.numEpisodios || 0
-  const vistos = obra ? contarEpisodiosVistosDaSerie(serieId) : 0
-  const progresso = totalEp ? Math.round((vistos / totalEp) * 100) : 0
+    return () => { cancelled = true }
+  }, [serieId, registrarObraNoIndice])
 
-  const seasons = useMemo(
-    () => seasonsRaw.filter((s) => s.season_number >= 0),
-    [seasonsRaw],
-  )
-
-  if (loading) return <div className="muted">Carregando…</div>
+  if (loading) return <div className="muted">Carregando a estrutura da série…</div>
   if (error) return <div className="error">{error}</div>
   if (!obra) return null
 
+  // Usando os métodos polimórficos do Nó Raiz
+  const totalEp = obra.getContagemEpisodios()
+  const vistos = contarEpisodiosVistosDaSerie(serieId)
+  const progresso = totalEp ? Math.round((vistos / totalEp) * 100) : 0
   const naWatchlist = estaNaWatchlist(obra)
 
   function marcarTudoVisto() {
-    // Carrega todas as temporadas e marca todos episódios.
-    Promise.all(
-      seasons
-        .filter((s) => s.season_number > 0)
-        .map((s) => tmdb.temporada(serieId, s.season_number)),
-    ).then((temporadas) => {
-      const todosEpisodios = []
-      for (const t of temporadas) {
-        for (const ep of t.episodes || []) {
-          todosEpisodios.push(
-            obraDeEpisodioTmdb(ep, { serieId, serieTitulo: obra.titulo }),
-          )
-        }
-      }
-      marcarSerieInteiraVista(todosEpisodios)
-      setNotificacao(`🎉 Toda a série "${obra.titulo}" foi marcada como vista!`)
-    })
+    // 🌳 COMPOSITE EM AÇÃO: Passamos apenas a raiz da árvore! 
+    // O contexto e as classes resolvem o resto recursivamente.
+    marcarSerieInteiraVista(obra)
+    setNotificacao(`🎉 Toda a série "${obra.titulo}" foi marcada como vista!`)
   }
 
   return (
     <div style={{ position: 'relative' }}>
       
-      {/* ✨ CAIXA DE AVISO CENTRALIZADA NO TEMA DO SITE */}
+      {/* Caixa de Notificação */}
       {notificacao && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'var(--background-card, #1e1e24)',
-            border: '2px solid var(--primary, #6366f1)',
-            borderRadius: '8px',
-            padding: '24px 32px',
-            boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
-            zIndex: 10000, // zIndex alto para ficar acima de qualquer elemento/modal
-            textAlign: 'center',
-            maxWidth: '90%',
-            width: '400px'
-          }} 
-          className="review-form"
-        >
-          <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', lineHeight: '1.4' }}>
-            {notificacao}
-          </p>
-          <button 
-            type="button"
-            className="btn primary" 
-            style={{ marginTop: '16px', padding: '6px 16px' }}
-            onClick={() => setNotificacao(null)}
-          >
+        <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            backgroundColor: 'var(--background-card, #1e1e24)', border: '2px solid var(--primary, #6366f1)',
+            borderRadius: '8px', padding: '24px 32px', boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+            zIndex: 10000, textAlign: 'center', maxWidth: '90%', width: '400px'
+          }} className="review-form">
+          <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', lineHeight: '1.4' }}>{notificacao}</p>
+          <button type="button" className="btn primary" style={{ marginTop: '16px', padding: '6px 16px' }} onClick={() => setNotificacao(null)}>
             Entendido
           </button>
         </div>
@@ -170,15 +126,9 @@ export default function SerieDetail() {
 
       <div className="series-hero">
         {posterUrl(obra.posterPath, 'w342') ? (
-          <img
-            className="poster"
-            src={posterUrl(obra.posterPath, 'w342')}
-            alt={obra.titulo}
-          />
+          <img className="poster" src={posterUrl(obra.posterPath, 'w342')} alt={obra.titulo} />
         ) : (
-          <div className="poster-placeholder" style={{ width: 200 }}>
-            Sem pôster
-          </div>
+          <div className="poster-placeholder" style={{ width: 200 }}>Sem pôster</div>
         )}
         <div>
           <div className="muted">
@@ -189,36 +139,36 @@ export default function SerieDetail() {
             {obra.getAno()} · {obra.getResumoMetadados()}
             {totalEp > 0 && ` · ${vistos}/${totalEp} vistos`}
           </div>
+          
+          {/* 🌳 COMPOSITE: O cálculo total exato processado em cascata pelos filhos! */}
+          {totalEp > 0 && (
+            <div className="meta" style={{ color: 'var(--primary, #6366f1)', fontWeight: 'bold', marginTop: '4px' }}>
+              ⏱️ Tempo de vida exigido: {obra.getDuracaoTotal()} minutos
+            </div>
+          )}
+
           {obra.generos.length > 0 && (
             <div className="tag-row">
-              {obra.generos.map((g) => (
-                <span className="tag" key={g}>{g}</span>
-              ))}
+              {obra.generos.map((g) => <span className="tag" key={g}>{g}</span>)}
             </div>
           )}
           {obra.criadores.length > 0 && (
-            <div className="muted">
-              Criação: {obra.criadores.join(', ')}
-            </div>
+            <div className="muted">Criação: {obra.criadores.join(', ')}</div>
           )}
           <p className="overview">{obra.sinopse}</p>
+          
           {totalEp > 0 && (
             <div className="progresso-barra" title={`${progresso}% concluído`}>
               <div style={{ width: `${progresso}%` }} />
             </div>
           )}
+
           {autenticado && (
             <div className="actions-row">
-              <button
-                className="btn primary"
-                onClick={() => setMostrandoLog((v) => !v)}
-              >
+              <button className="btn primary" onClick={() => setMostrandoLog((v) => !v)}>
                 + Registrar no diário
               </button>
-              <button
-                className={'btn ' + (naWatchlist ? 'toggle-on' : '')}
-                onClick={() => alternarWatchlist(obra)}
-              >
+              <button className={'btn ' + (naWatchlist ? 'toggle-on' : '')} onClick={() => alternarWatchlist(obra)}>
                 {naWatchlist ? '✓ Na watchlist' : '+ Watchlist'}
               </button>
               <button className="btn" onClick={marcarTudoVisto}>
@@ -236,8 +186,7 @@ export default function SerieDetail() {
             obra={obra}
             onSubmit={(dados) => {
               registrarLog(obra, dados)
-              setMostrandoLog(false) // Fecha o formulário
-              // Aciona a mensagem na raiz do componente pai, sobrevivendo ao unmount!
+              setMostrandoLog(false)
               setNotificacao(`🎉 "${obra.titulo}" foi registrada no seu diário com sucesso!`)
             }}
             onCancel={() => setMostrandoLog(false)}
@@ -246,59 +195,61 @@ export default function SerieDetail() {
       )}
 
       <h2 className="section-title">Temporadas</h2>
-      {seasons.length === 0 && (
-        <div className="empty-state">Sem dados de temporada.</div>
+      {obra.getFilhos().length === 0 && (
+        <div className="empty-state">Nenhuma temporada encontrada.</div>
       )}
-      {seasons.map((s) => (
+      
+      {/* Renderizando as temporadas a partir dos NÓS INTERMEDIÁRIOS da árvore */}
+      {obra.getFilhos().map((temporadaObra) => (
         <SeasonBlock
-          key={s.id}
-          serieObra={obra}
-          season={s}
-          open={openSeason === s.season_number}
-          onToggle={() =>
-            setOpenSeason(openSeason === s.season_number ? null : s.season_number)
-          }
-          data={seasonCache[s.season_number]}
+          key={temporadaObra.id}
+          temporada={temporadaObra}
+          open={openSeason === temporadaObra.numeroTemporada}
+          onToggle={() => setOpenSeason(openSeason === temporadaObra.numeroTemporada ? null : temporadaObra.numeroTemporada)}
         />
       ))}
     </div>
   )
 }
 
-function SeasonBlock({ serieObra, season, open, onToggle, data }) {
+/**
+ * REFATORAÇÃO COMPOSITE: 
+ * O bloco de temporada não recebe mais dados brutos do TMDB. 
+ * Ele recebe a instância da classe `Temporada` e usa seus métodos.
+ */
+function SeasonBlock({ temporada, open, onToggle }) {
   const { episodioVisto, alternarEpisodioVisto } = useUserData()
+  
+  // Pegando as FOLHAS (Episódios) da árvore
+  const episodios = temporada.getFilhos()
+
   return (
     <div className="season-section">
       <button className="season-toggle" onClick={onToggle}>
         <span>
-          {season.name || `Temporada ${season.season_number}`}
-          {season.episode_count ? ` · ${season.episode_count} episódios` : ''}
-          {season.air_date ? ` · ${season.air_date.slice(0, 4)}` : ''}
+          {temporada.titulo} · {temporada.getContagemEpisodios()} episódios
+          {temporada.dataLancamento ? ` · ${temporada.dataLancamento.slice(0, 4)}` : ''}
         </span>
         <span>{open ? '▾' : '▸'}</span>
       </button>
       {open && (
         <div className="episode-list">
-          {!data && <div className="muted">Carregando episódios…</div>}
-          {data?.episodes?.map((ep) => {
-            const epObra = obraDeEpisodioTmdb(ep, {
-              serieId: serieObra.id,
-              serieTitulo: serieObra.titulo,
-            })
-            const visto = episodioVisto(epObra)
+          {episodios.length === 0 && <div className="muted">Nenhum episódio listado.</div>}
+          
+          {episodios.map((ep) => {
+            const visto = episodioVisto(ep)
             return (
               <div className="episode-row" key={ep.id}>
                 <span className="episode-num">
-                  S{String(ep.season_number).padStart(2, '0')}E
-                  {String(ep.episode_number).padStart(2, '0')}
+                  S{String(ep.numeroTemporada).padStart(2, '0')}E{String(ep.numeroEpisodio).padStart(2, '0')}
                 </span>
-                <Link to={epObra.getRota()} className="episode-title">
-                  {ep.name || `Episódio ${ep.episode_number}`}
+                <Link to={ep.getRota()} className="episode-title">
+                  {ep.titulo}
                 </Link>
-                <span className="episode-air">{ep.air_date || ''}</span>
+                <span className="episode-air">{ep.dataLancamento || 'TBA'}</span>
                 <button
                   className={'btn ' + (visto ? 'toggle-on' : '')}
-                  onClick={() => alternarEpisodioVisto(epObra)}
+                  onClick={() => alternarEpisodioVisto(ep)}
                 >
                   {visto ? '✓ Visto' : 'Marcar'}
                 </button>

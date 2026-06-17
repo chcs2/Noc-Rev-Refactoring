@@ -1,6 +1,6 @@
 /**
  * Fábrica de Obras — converte respostas brutas do TMDB nas subclasses
- * apropriadas (Filme, Documentario, Serie, Minisserie, Episodio).
+ * apropriadas (Filme, Documentario, Serie, Minisserie, Temporada, Episodio).
  *
  * Ponto-chave da Modelagem Universal (req. 3.2.1): a interface da aplicação
  * trabalha com `Obra` (polimorficamente). Esta fábrica é o único lugar que
@@ -12,6 +12,7 @@ import Filme from './Filme.js'
 import Documentario from './Documentario.js'
 import Serie from './Serie.js'
 import Minisserie from './Minisserie.js'
+import Temporada from './Temporada.js' // 🌳 Novo Import do Composite
 import Episodio from './Episodio.js'
 
 const TMDB_GENERO_DOCUMENTARIO = 99
@@ -19,13 +20,13 @@ const TMDB_GENERO_DOCUMENTARIO = 99
 /**
  * 🧬 REPOSITÓRIO DE PROTÓTIPOS (Prototype Cache / Registry)
  * Criamos instâncias vazias de cada classe para servirem de "molde de métodos" (Protótipos).
- * O JavaScript usará essas instâncias para herança de comportamento via cadeia de protótipos.
  */
 const moldesPrototipo = {
   'Filme': new Filme({ id: 0, titulo: '', generos: [] }),
   'Documentário': new Documentario({ id: 0, titulo: '', generos: [] }),
   'Série': new Serie({ id: 0, titulo: '', generos: [] }),
   'Minissérie': new Minisserie({ id: 0, titulo: '', generos: [] }),
+  'Temporada': new Temporada({ id: 0, titulo: '', generos: [] }), // 🌳 Novo molde
   'Episódio': new Episodio({ id: 0, titulo: '', generos: [] })
 }
 
@@ -67,6 +68,19 @@ export function obraDeSerieTmdb(data) {
   return new Serie(props)
 }
 
+/** Nova Fábrica para o Nó Intermediário do Composite */
+export function obraDeTemporadaTmdb(data, contexto = {}) {
+  return new Temporada({
+    id: data.id,
+    titulo: data.name || `Temporada ${data.season_number}`,
+    posterPath: data.poster_path,
+    dataLancamento: data.air_date,
+    sinopse: data.overview,
+    serieId: contexto.serieId,
+    numeroTemporada: data.season_number
+  })
+}
+
 export function obraDeEpisodioTmdb(data, contexto = {}) {
   return new Episodio({
     id: data.id,
@@ -82,6 +96,42 @@ export function obraDeEpisodioTmdb(data, contexto = {}) {
   })
 }
 
+/**
+ * PADRÃO COMPOSITE: O Mestre de Obras (Tree Builder)
+ * Monta a hierarquia completa de instâncias: Série -> Temporadas -> Episódios.
+ * * @param {Object} serieBruta - JSON da resposta `/tv/{id}` do TMDB.
+ * @param {Array} temporadasComEpisodios - Array de respostas `/tv/{id}/season/{num}` do TMDB.
+ */
+export function montarArvoreCompositeSerie(serieBruta, temporadasComEpisodios = []) {
+  // 1. Cria o Nó Raiz (Série)
+  const serie = obraDeSerieTmdb(serieBruta)
+
+  // 2. Itera sobre as temporadas completas que vieram da API
+  temporadasComEpisodios.forEach(tempData => {
+    // Cria o Nó Intermediário (Temporada)
+    const temporada = obraDeTemporadaTmdb(tempData, { serieId: serie.id })
+
+    // 3. Verifica se existem episódios dentro desta temporada
+    if (tempData.episodes && Array.isArray(tempData.episodes)) {
+      tempData.episodes.forEach(epData => {
+        // Cria a Folha (Episódio)
+        const episodio = obraDeEpisodioTmdb(epData, {
+          serieId: serie.id,
+          serieTitulo: serie.titulo,
+        })
+        // COMPOSITE EM AÇÃO: Liga a folha no nó intermediário
+        temporada.adicionarFilho(episodio)
+      })
+    }
+
+    // COMPOSITE EM AÇÃO: Liga o nó intermediário na raiz
+    serie.adicionarFilho(temporada)
+  })
+
+  // Retorna a árvore pronta e calculada!
+  return serie
+}
+
 function extrairDiretoresDeCredits(data) {
   const crew = data.credits?.crew || []
   return crew.filter((c) => c.job === 'Director').map((c) => c.name)
@@ -90,34 +140,25 @@ function extrairDiretoresDeCredits(data) {
 /**
  * Recria uma Obra a partir do índice serializado em localStorage.
  * O campo `tipo` (string) é o discriminador.
- * * 🧬 CRITICAL UPDATE (Prototype Pattern):
- * Eliminamos o switch/case massivo. Usamos a herança de protótipo nativa do JS
- * para acoplar os métodos polimórficos de forma instantânea e leve.
+ * * CRITICAL UPDATE (Prototype Pattern):
+ * Eliminamos o switch/case massivo. Usamos a herança de protótipo nativa do JS.
  */
 export function obraDeIndice(item) {
   if (!item || !item.tipo) return null
 
-  // 1. Busca o protótipo correspondente no repositório
   const prototipoMolde = moldesPrototipo[item.tipo]
   
   if (!prototipoMolde) return null
 
-  /**
-   * 2. 🧬 Object.create() em ação:
-   * Cria um objeto totalmente novo e limpo, cujo PAI (__proto__) aponta diretamente 
-   * para o nosso protótipo de classe mapeado. Ele herda métodos polimórficos como
-   * getRota(), getIconeSelo() e paraIndice() sem passar por um construtor "new" custoso.
-   */
   const novaInstanciaObra = Object.create(Object.getPrototypeOf(prototipoMolde))
 
-  /**
-   * 3. Object.assign() preenche o clone:
-   * Mesclamos os dados puros extraídos do JSON do localStorage para dentro da cópia,
-   * isolando o escopo deste item específico na memória.
-   */
   Object.assign(novaInstanciaObra, item)
+
+  // Opcional/Futuro: Se o localStorage começar a salvar árvores compostas,
+  // você chamaria a recursão aqui para recriar os filhos também. 
+  // Por enquanto, listas e diários lidam com obras de forma plana.
 
   return novaInstanciaObra
 }
 
-export { Obra, Filme, Documentario, Serie, Minisserie, Episodio }
+export { Obra, Filme, Documentario, Serie, Minisserie, Temporada, Episodio }

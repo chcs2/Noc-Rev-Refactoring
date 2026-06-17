@@ -3,15 +3,6 @@
  *
  * Recebe a lista de entradas do diário + o índice de obras e produz
  * agregações para o Dashboard de Consumo.
- *
- * Retornos:
- *  - totalRegistros
- *  - totalHorasAssistidas (soma de obra.getDuracaoMinutos() / 60)
- *  - porTipo: { Filme: 12, Série: 3, ... }
- *  - porGenero: [{ nome, contagem }]
- *  - porDiretor: [{ nome, contagem }]
- *  - porAno: { 2024: 12, 2025: 4 }
- *  - mediaNotas
  */
 
 import { obraDeIndice } from '../domain/factory.js'
@@ -29,6 +20,12 @@ export function calcularEstatisticas({ diary, obraIndex, anoFiltro = null }) {
     contagemNotas: 0,
   }
 
+  // Descobre quais episódios individuais estão marcados como vistos no localStorage global
+  // para podermos computar o tempo real caso o usuário registre a Série no Diário.
+  const todosIdsVistos = Object.keys(obraIndex).filter(chave => {
+    return chave.startsWith('episodio:') && obraIndex[chave]?.visto === true
+  })
+
   const entradasFiltradas = diary.filter((e) => {
     if (!anoFiltro) return true
     const ano = (e.dataVisualizacao || '').slice(0, 4)
@@ -36,15 +33,44 @@ export function calcularEstatisticas({ diary, obraIndex, anoFiltro = null }) {
   })
 
   for (const entry of entradasFiltradas) {
-    const obra = obraDeIndice(obraIndex[entry.obraIdUnique])
+    const dadosCrus = obraIndex[entry.obraIdUnique]
+    const obra = obraDeIndice(dadosCrus)
     if (!obra) continue
     total.totalRegistros++
 
-    // Horas (POLIMORFISMO em ação: cada subclasse calcula a sua duração)
-    total.totalHorasAssistidas += (obra.getDuracaoMinutos() || 0) / 60
-
-    // Tipo
     const tipo = obra.getTipo()
+
+    // ⏱️ CÁLCULO DE HORAS BLINDADO E CORRIGIDO
+    if (tipo === 'Série') {
+      const idSeriePura = obra.id
+      const minutosAssistidosDaSerie = todosIdsVistos
+        .filter(chaveEp => chaveEp.startsWith(`episodio:${idSeriePura}:`))
+        .reduce((soma, chaveEp) => {
+          const epDado = obraIndex[chaveEp]
+          return soma + (epDado?.runtime || dadosCrus?.duracaoMediaEpisodio || 0)
+        }, 0)
+
+      if (minutosAssistidosDaSerie > 0) {
+        // 1. Somatório exato apenas dos episódios marcados como vistos
+        total.totalHorasAssistidas += minutosAssistidosDaSerie / 60
+      } else if (dadosCrus?.visto === true) {
+        // 2. O usuário clicou explicitamente em "Marcar série inteira como vista"
+        total.totalHorasAssistidas += (obra.getDuracaoMinutos() || 0) / 60
+      } else {
+        // 3. Apenas registrou um log (resenha/nota), mas não marcou que viu episódios.
+        // Solução: Não adiciona nenhuma hora fantasma!
+        total.totalHorasAssistidas += 0 
+      }
+    } else if (tipo === 'Episódio') {
+      // Se for log de episódio granular, extrai o tempo direto do runtime salvo
+      const minutosEp = dadosCrus?.runtime || obra.getDuracaoMinutos() || 0
+      total.totalHorasAssistidas += minutosEp / 60
+    } else {
+      // Filmes e Documentários usam o padrão polimórfico original
+      total.totalHorasAssistidas += (obra.getDuracaoMinutos() || 0) / 60
+    }
+
+    // Agrupamento por Tipo
     total.porTipo[tipo] = (total.porTipo[tipo] || 0) + 1
 
     // Gêneros
@@ -52,7 +78,7 @@ export function calcularEstatisticas({ diary, obraIndex, anoFiltro = null }) {
       total.porGenero[g] = (total.porGenero[g] || 0) + 1
     }
 
-    // Diretores (Filme/Documentário) ou Criadores (Série/Minissérie)
+    // Diretores ou Criadores
     const responsaveis = obra.diretores || obra.criadores || []
     for (const r of responsaveis) {
       total.porDiretor[r] = (total.porDiretor[r] || 0) + 1
@@ -71,6 +97,8 @@ export function calcularEstatisticas({ diary, obraIndex, anoFiltro = null }) {
 
   total.mediaNotas =
     total.contagemNotas > 0 ? total.somaNotas / total.contagemNotas : 0
+  
+  // Arredonda as horas assistidas de forma limpa para exibição (ex: 12.5 horas)
   total.totalHorasAssistidas = Math.round(total.totalHorasAssistidas * 10) / 10
 
   // Top-N para diretores e gêneros

@@ -3,6 +3,10 @@ import Obra from './Obra.js'
 /**
  * Episódio — herda de Obra. É uma unidade granular usada nas Listas Mistas
  * (req. 3.2.4) e no Sistema de Progresso Flexível (req. 3.2.2).
+ *
+ * Padrão Composite: Atua como a FOLHA (Leaf) da árvore de Séries.
+ * Sendo a menor unidade, não suporta filhos. Sua estrutura de dados
+ * resolve a ponta final dos cálculos de recursão (duração e contagem).
  */
 export default class Episodio extends Obra {
   constructor(props) {
@@ -12,8 +16,51 @@ export default class Episodio extends Obra {
     this.numeroEpisodio = props.numeroEpisodio
     this.runtime = props.runtime || 0
     this.serieTitulo = props.serieTitulo || ''
+    
+    // ✨ NOVO: Propriedade de estado da Folha
+    this.visto = !!props.visto
   }
 
+  
+  // Composite: Operações de Estado em Massa
+  
+
+  /**
+   * Define o status de "visto" desta folha.
+   * @param {boolean} status 
+   */
+  setVisto(status) {
+    this.visto = !!status
+  }
+
+  /**
+   * Retorna se este episódio já foi visto.
+   */
+  isVisto() {
+    return this.visto
+  }
+
+  
+  // Composite : Implementação da Folha (Leaf)
+  
+
+  /** * Composite: Na recursão da árvore, a folha responde que vale exatamente 1. */
+  getContagemEpisodios() {
+    return 1
+  }
+
+  /** 
+   * ✨ NOVO / BLINDAGEM: Garante que a folha retorne sua própria duração 
+   * em qualquer cálculo do padrão Composite, ignorando comportamentos do Obra.js
+   */
+  getDuracaoTotal() {
+    return this.runtime || 0
+  }
+
+
+  // Métodos Originais polimórficos
+  
+  
   getTipo() {
     return 'Episódio'
   }
@@ -48,6 +95,8 @@ export default class Episodio extends Obra {
       numeroTemporada: this.numeroTemporada,
       numeroEpisodio: this.numeroEpisodio,
       runtime: this.runtime,
+      // Garante que o estado seja salvo no localStorage
+      visto: this.visto,
     }
   }
 }
