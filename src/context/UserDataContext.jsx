@@ -10,6 +10,35 @@ import { load, save, userScoped } from '../utils/storage.js'
 import { useAuth } from './AuthContext.jsx'
 import { obraDeIndice } from '../domain/factory.js'
 
+/**
+ * IMPLEMENTAÇÃO DO PADRÃO COMPORTAMENTAL OBSERVER
+ * Cria um Subject (Gerenciador de Eventos) centralizado para que outros 
+ * sistemas fiquem sabendo de ações do usuário sem gerar acoplamento rígido.
+ */
+class EventNotifier {
+  constructor() {
+    this.observers = {}
+  }
+
+  inscrever(evento, callback) {
+    if (!this.observers[evento]) this.observers[evento] = []
+    this.observers[evento].push(callback)
+  }
+
+  // 👇 Método adicionado para evitar travamentos quando componentes são fechados
+  desinscrever(evento, callback) {
+    if (!this.observers[evento]) return
+    this.observers[evento] = this.observers[evento].filter(cb => cb !== callback)
+  }
+
+  notificar(evento, dados) {
+    if (!this.observers[evento]) return
+    this.observers[evento].forEach(callback => callback(dados))
+  }
+}
+
+export const appEvents = new EventNotifier()
+
 const UserDataContext = createContext(null)
 
 function loadUser(userId, key, fallback) {
@@ -23,7 +52,9 @@ export function UserDataProvider({ children }) {
   const { usuarioAtual } = useAuth()
   const userId = usuarioAtual?.id || null
 
-  const [obraIndex, setObraIndex] = useState(() => load('obraIndex', {}))
+  // 🛡️ CORREÇÃO: O estado inicial do index agora começa vazio
+  // e se adapta dinamicamente ao usuário logado.
+  const [obraIndex, setObraIndex] = useState({})
   const [dataVersion, setDataVersion] = useState(0)
 
   const [diary, setDiary] = useState([])
@@ -34,10 +65,9 @@ export function UserDataProvider({ children }) {
   const [reviewLikes, setReviewLikes] = useState({})
   const [listComments, setListComments] = useState({})
 
-  useEffect(() => save('obraIndex', obraIndex), [obraIndex])
-
   useEffect(() => {
     if (!userId) {
+      setObraIndex({})
       setDiary([])
       setLists([])
       setWatchlist({})
@@ -47,6 +77,7 @@ export function UserDataProvider({ children }) {
       setListComments({})
       return
     }
+    setObraIndex(loadUser(userId, 'obraIndex', {}))
     setDiary(loadUser(userId, 'diary', []))
     setLists(loadUser(userId, 'lists', []))
     setWatchlist(loadUser(userId, 'watchlist', {}))
@@ -56,6 +87,7 @@ export function UserDataProvider({ children }) {
     setListComments(loadUser(userId, 'listComments', {}))
   }, [userId])
 
+  useEffect(() => { if (userId) saveUser(userId, 'obraIndex', obraIndex) }, [userId, obraIndex])
   useEffect(() => { if (userId) saveUser(userId, 'diary', diary) }, [userId, diary])
   useEffect(() => { if (userId) saveUser(userId, 'lists', lists) }, [userId, lists])
   useEffect(() => { if (userId) saveUser(userId, 'watchlist', watchlist) }, [userId, watchlist])
@@ -64,16 +96,37 @@ export function UserDataProvider({ children }) {
   useEffect(() => { if (userId) saveUser(userId, 'reviewLikes', reviewLikes) }, [userId, reviewLikes])
   useEffect(() => { if (userId) saveUser(userId, 'listComments', listComments) }, [userId, listComments])
 
-  /* Índice de Obras (Modelagem Universal) */
+  /* Índice de Obras */
   const registrarObraNoIndice = useCallback((obra) => {
     if (!obra) return
     const chave = obra.getIdentificadorUnico()
     setObraIndex((prev) => ({ ...prev, [chave]: obra.paraIndice() }))
   }, [])
 
+  // 🌍 BUSCA GLOBAL DE OBRAS: Procura no índice local, se não achar, varre outros usuários
   const obterObraDoIndice = useCallback(
-    (chave) => obraDeIndice(obraIndex[chave]),
-    [obraIndex],
+    (chave) => {
+      // 1. Tenta achar no índice do usuário logado (rápido)
+      if (obraIndex[chave]) {
+        return obraDeIndice(obraIndex[chave])
+      }
+
+      // 2. Se não achar, procura nos índices dos outros usuários (Busca Global)
+      const usuarios = load('auth.users', {})
+      
+      for (const id of Object.keys(usuarios)) {
+        if (id === userId) continue // Pula o atual pois já checamos
+        
+        const indexDeOutro = loadUser(id, 'obraIndex', {})
+        if (indexDeOutro[chave]) {
+          return obraDeIndice(indexDeOutro[chave]) // Achou no banco de outro usuário!
+        }
+      }
+
+      // 3. Se realmente ninguém tem essa obra, retorna null
+      return null
+    },
+    [obraIndex, userId],
   )
 
   /* Diário / Avaliações */
@@ -101,6 +154,9 @@ export function UserDataProvider({ children }) {
           [entry.obraIdUnique]: Date.now(),
         }))
       }
+
+      // 🚀 OBSERVER
+      appEvents.notificar('NOVO_LOG_DIARIO', { userId, entry, obra })
       
       return entry
     },
@@ -129,13 +185,12 @@ export function UserDataProvider({ children }) {
     ({ nome, descricao = '', visibilidade = 'publica', itens = [] }) => {
       if (!userId) throw new Error('Faça login para criar listas.')
       
-      // ✨ CORREÇÃO: itens agora é recebido por parâmetro e clonado [...itens]
       const lista = { 
         id: 'lst_' + Math.random().toString(36).slice(2, 10), 
         nome, 
         descricao, 
         visibilidade, 
-        itens: [...itens], 
+        itens: [...itens], // Clone do array para evitar referências mutáveis
         criadoEm: Date.now(), 
         atualizadoEm: Date.now() 
       }
@@ -206,7 +261,7 @@ export function UserDataProvider({ children }) {
     [registrarObraNoIndice],
   )
 
-  // INTEGRAÇÃO COM O PADRÃO COMPOSITE (Progresso Flexível)
+  /* Progressos (Composite integrado) */
   const episodioVisto = useCallback(
     (episodio) => {
       if (episodio.isVisto()) return true
@@ -229,8 +284,11 @@ export function UserDataProvider({ children }) {
         else next[chave] = Date.now()
         return next
       })
+
+      // 🚀 OBSERVER
+      appEvents.notificar('EPISODIO_STATUS_ALTERADO', { userId, episodio, visto: !estavaVisto })
     },
-    [watchedEpisodes, registrarObraNoIndice],
+    [watchedEpisodes, registrarObraNoIndice, userId],
   )
 
   const contarEpisodiosVistosDaSerie = useCallback(
@@ -266,11 +324,14 @@ export function UserDataProvider({ children }) {
         preencherIds(serieArvore)
         return novos
       })
+
+      // 🚀 OBSERVER
+      appEvents.notificar('SERIE_COMPLETA_VISTA', { userId, serieId: serieArvore.id })
     },
-    [registrarObraNoIndice],
+    [registrarObraNoIndice, userId],
   )
 
-  // Social
+  /* Social */
   const seguir = useCallback(
     (alvoId) => {
       if (!userId || alvoId === userId) return
