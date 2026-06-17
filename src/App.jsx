@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import Navbar from './components/Navbar.jsx'
+import { NotificadorGlobal } from './components/NotificadorGlobal.jsx' // 🔔 IMPORTADO AQUI
 
 import Home from './pages/Home.jsx'
 import Browse from './pages/Browse.jsx'
@@ -29,6 +30,9 @@ function Protegida({ children }) {
 export default function App() {
   return (
     <div className="app">
+      {/* OBSERVER ATIVO: Fica invisível e escutando as ações globais */}
+      <NotificadorGlobal />
+      
       <Navbar />
       <main className="container">
         <Routes>

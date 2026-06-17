@@ -24,7 +24,6 @@ export default function SerieDetail() {
   const [loading, setLoading] = useState(true)
   const [openSeason, setOpenSeason] = useState(null)
   const [mostrandoLog, setMostrandoLog] = useState(false)
-  const [notificacao, setNotificacao] = useState(null)
 
   const { autenticado } = useAuth()
   const {
@@ -35,13 +34,6 @@ export default function SerieDetail() {
     marcarSerieInteiraVista,
     registrarObraNoIndice,
   } = useUserData()
-
-  useEffect(() => {
-    if (notificacao) {
-      const timer = setTimeout(() => setNotificacao(null), 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [notificacao])
 
   useEffect(() => {
     let cancelled = false
@@ -102,27 +94,12 @@ export default function SerieDetail() {
   function marcarTudoVisto() {
     // 🌳 COMPOSITE EM AÇÃO: Passamos apenas a raiz da árvore! 
     // O contexto e as classes resolvem o resto recursivamente.
+    // 🔔 O NotificadorGlobal vai capturar essa ação automaticamente!
     marcarSerieInteiraVista(obra)
-    setNotificacao(`🎉 Toda a série "${obra.titulo}" foi marcada como vista!`)
   }
 
   return (
     <div style={{ position: 'relative' }}>
-      
-      {/* Caixa de Notificação */}
-      {notificacao && (
-        <div style={{
-            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-            backgroundColor: 'var(--background-card, #1e1e24)', border: '2px solid var(--primary, #6366f1)',
-            borderRadius: '8px', padding: '24px 32px', boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
-            zIndex: 10000, textAlign: 'center', maxWidth: '90%', width: '400px'
-          }} className="review-form">
-          <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', lineHeight: '1.4' }}>{notificacao}</p>
-          <button type="button" className="btn primary" style={{ marginTop: '16px', padding: '6px 16px' }} onClick={() => setNotificacao(null)}>
-            Entendido
-          </button>
-        </div>
-      )}
 
       <div className="series-hero">
         {posterUrl(obra.posterPath, 'w342') ? (
@@ -187,7 +164,7 @@ export default function SerieDetail() {
             onSubmit={(dados) => {
               registrarLog(obra, dados)
               setMostrandoLog(false)
-              setNotificacao(`🎉 "${obra.titulo}" foi registrada no seu diário com sucesso!`)
+              // 🔔 O NotificadorGlobal vai capturar o 'NOVO_LOG_DIARIO' disparado pelo registrarLog!
             }}
             onCancel={() => setMostrandoLog(false)}
           />

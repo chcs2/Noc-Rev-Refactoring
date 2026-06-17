@@ -25,7 +25,7 @@ class EventNotifier {
     this.observers[evento].push(callback)
   }
 
-  // 👇 Método adicionado para evitar travamentos quando componentes são fechados
+  // Método adicionado para evitar travamentos quando componentes são fechados
   desinscrever(evento, callback) {
     if (!this.observers[evento]) return
     this.observers[evento] = this.observers[evento].filter(cb => cb !== callback)
@@ -251,10 +251,25 @@ export function UserDataProvider({ children }) {
     (obra) => {
       registrarObraNoIndice(obra)
       const chave = obra.getIdentificadorUnico()
+      
       setWatchlist((prev) => {
         const next = { ...prev }
-        if (next[chave]) delete next[chave]
-        else next[chave] = { adicionadoEm: Date.now() }
+        const jaEstavaNaWatchlist = Boolean(next[chave])
+        
+        if (jaEstavaNaWatchlist) {
+          delete next[chave]
+        } else {
+          next[chave] = { adicionadoEm: Date.now() }
+        }
+
+        // 🚀 OBSERVER - Notificamos o sistema de forma assíncrona para não travar o fluxo de renderização
+        setTimeout(() => {
+          appEvents.notificar('WATCHLIST_ALTERADA', { 
+            obra: obra, 
+            adicionado: !jaEstavaNaWatchlist 
+          })
+        }, 0)
+
         return next
       })
     },
