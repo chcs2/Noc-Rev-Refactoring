@@ -91,7 +91,7 @@ ___
 
 ## Arquitetura e padrões
 
-### Padrão Criacional Prototype
+### Padrão Criacional Prototype 🧬
 
 - 
   O que é o padrão: O Prototype é um padrão de projeto criacional que permite copiar (clonar) objetos complexos sem que o código cliente precise depender de suas classes concretas ou conhecer seus detalhes internos.
@@ -107,7 +107,7 @@ ___
 - `pages/Diario.jsx` - A função prepararNovaRevisao permite usar os dados de uma avaliação antiga (nota, curtida, resenha) como molde (protótipo) para preencher automaticamente o formulário de uma nova linha do tempo/visualização da mesma obra.
 
 
-### Padrão Estrutural Composite
+### Padrão Estrutural Composite 🌿
 
 - O que é o padrão: Responsável por permitir que a aplicação trate tanto uma obra isolada (um episódio) quanto uma coleção complexa de obras (uma temporada ou série) de forma unificada. Isso elimina a necessidade do código cliente fazer dezenas de validações if/else para saber com que tipo de dado está lidando.
 
