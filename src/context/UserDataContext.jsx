@@ -129,9 +129,9 @@ export function UserDataProvider({ children }) {
     [obraIndex, userId],
   )
 
-  // ========================================================================
-  // 🧬 IMPLEMENTAÇÃO PRÁTICA DO PADRÃO PROTOTYPE 
-  // ========================================================================
+
+  // IMPLEMENTAÇÃO PRÁTICA DO PADRÃO PROTOTYPE 
+  
   const duplicarObraPersonalizada = useCallback((obraOriginal, novoTitulo) => {
     if (!obraOriginal || typeof obraOriginal.clone !== 'function') {
       throw new Error('A obra fornecida não suporta o padrão Prototype (método clone não encontrado).')

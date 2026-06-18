@@ -50,7 +50,7 @@ export default class Episodio extends Obra {
   }
 
   /** 
-   * ✨ NOVO / BLINDAGEM: Garante que a folha retorne sua própria duração 
+   * Garante que a folha retorne sua própria duração 
    * em qualquer cálculo do padrão Composite, ignorando comportamentos do Obra.js
    */
   getDuracaoTotal() {

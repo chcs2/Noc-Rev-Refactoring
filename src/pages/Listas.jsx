@@ -38,7 +38,7 @@ export default function Listas() {
   }
 
   /**
-   * Implementação do Padrão Prototype 🧬
+   * Implementação do Padrão Prototype
    * Recebe um protótipo de lista existente e gera uma cópia idêntica e isolada.
    */
   function duplicarLista(listaPrototipo) {

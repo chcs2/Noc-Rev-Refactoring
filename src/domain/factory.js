@@ -18,7 +18,7 @@ import Episodio from './Episodio.js'
 const TMDB_GENERO_DOCUMENTARIO = 99
 
 /**
- * 🧬 REPOSITÓRIO DE PROTÓTIPOS (Prototype Cache / Registry)
+ * REPOSITÓRIO DE PROTÓTIPOS (Prototype Cache / Registry)
  * Criamos instâncias vazias de cada classe para servirem de "molde de métodos" (Protótipos).
  */
 const moldesPrototipo = {

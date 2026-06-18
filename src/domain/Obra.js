@@ -20,7 +20,7 @@ export default class Obra {
   }
 
   /**
-   * Implementação do Padrão Prototype 🧬
+   * Implementação do Padrão Prototype 
    * Retorna uma cópia idêntica da instância atual de forma polimórfica.
    */
   clone() {
@@ -67,9 +67,7 @@ export default class Obra {
     return 0
   }
 
-  // ========================================================================
   // MÉTODOS ORIGINAIS POLIMÓRFICOS
-  // ========================================================================
 
   /** Polimórfico — cada subclasse retorna o rótulo do seu tipo. */
   getTipo() {

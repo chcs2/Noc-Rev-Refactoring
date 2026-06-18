@@ -75,7 +75,7 @@ export default function Diario() {
   }
 
   /**
-   * 🧬 Padrão Prototype implementado na Prática
+   * Padrão Prototype implementado na Prática
    * Clona o estado interno da avaliação antiga para servir de molde a uma nova linha do tempo
    */
   function prepararNovaRevisao(entry) {
@@ -187,7 +187,7 @@ export default function Diario() {
         </div>
       )}
 
-      {/* 🔄 3. ÁREA DE FORMULÁRIO DE NOVA REVISÃO (PROTOTYPE) */}
+      {/* 3. ÁREA DE FORMULÁRIO DE NOVA REVISÃO (PROTOTYPE) */}
       {revisaoPrototipo && (
         <div className="review-form" style={{ marginBottom: '24px', border: '1px dashed var(--primary)' }}>
           <div className="log-form-header">
@@ -278,7 +278,7 @@ export default function Diario() {
                       <span className="muted">❤ {totalLikes} curtida{totalLikes === 1 ? '' : 's'}</span>
                       <button className="btn" onClick={() => comecarEdicao(entry)}>Editar</button>
                       
-                      {/* 🧬 BOTÃO INJETADO DO PROTOTYPE */}
+                      {/* BOTÃO INJETADO DO PROTOTYPE */}
                       <button 
                         className="btn" 
                         style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
