@@ -92,6 +92,9 @@ ___
 ## Arquitetura e padrões
 
 - 
+
+### Padrão Criacional Prototype
+
   O que é o padrão:
 
   O Prototype é um padrão de projeto criacional que permite copiar (clonar) objetos complexos sem que o código cliente precise depender de suas classes concretas ou conhecer seus detalhes internos.
