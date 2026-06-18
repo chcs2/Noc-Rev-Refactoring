@@ -86,3 +86,21 @@ src/
   rebuscar o TMDB.
 - A autenticação é mock — não há senha nem servidor. Substitua
   `AuthContext.jsx` por chamadas a um backend real para produção.
+
+___
+
+## Arquitetura e padrões
+
+```
+O que é o padrão:
+
+O Prototype é um padrão de projeto criacional que permite copiar (clonar) objetos complexos sem que o código cliente precise depender de suas classes concretas ou conhecer seus detalhes internos.
+
+Abaixo, detalhados os locais e como o padrão atua nas diferentes camadas do sistema:
+
+domain/obra.js - A superclasse define a interface base de clonagem que é herdada por todos os tipos de obras, o mesmo foi implementado o método clone() que utiliza new this.constructor para garantir o polimorfismo na hora da cópia, o método também aplica o spread operator [...] para realizar a clonagem profunda (Deep Copy) dos arrays de generos, diretores e criadores, assegurando que o clone tenha vida própria na memória.
+
+
+
+```
+---
