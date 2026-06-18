@@ -109,7 +109,7 @@ ___
   `pages/Listas.jsx` - A função duplicarLista(listaPrototipo) gera uma cópia exata de uma lista do usuário, também foi feita a clonagem profunda ([...listaPrototipo.itens]) para garantir que as edições na cópia não afetem os itens da lista original.
 
   `pages/Diario.jsx` - A função prepararNovaRevisao permite usar os dados de uma avaliação antiga (nota, curtida, resenha) como molde (protótipo) para preencher automaticamente o formulário de uma nova linha do tempo/visualização da mesma obra.
-- 
+
 
 
 ---
