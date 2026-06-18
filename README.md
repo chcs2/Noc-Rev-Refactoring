@@ -91,7 +91,7 @@ ___
 
 ## Arquitetura e padrões
 
-**Padrão Criacional Prototype**
+### Padrão Criacional Prototype
 
 - 
   O que é o padrão: O Prototype é um padrão de projeto criacional que permite copiar (clonar) objetos complexos sem que o código cliente precise depender de suas classes concretas ou conhecer seus detalhes internos.
@@ -105,6 +105,19 @@ ___
 - `pages/Listas.jsx` - A função duplicarLista(listaPrototipo) gera uma cópia exata de uma lista do usuário, também foi feita a clonagem profunda ([...listaPrototipo.itens]) para garantir que as edições na cópia não afetem os itens da lista original.
 
 - `pages/Diario.jsx` - A função prepararNovaRevisao permite usar os dados de uma avaliação antiga (nota, curtida, resenha) como molde (protótipo) para preencher automaticamente o formulário de uma nova linha do tempo/visualização da mesma obra.
+
+
+### Padrão Estrutural Composite
+
+- O que é o padrão: Responsável por permitir que a aplicação trate tanto uma obra isolada (um episódio) quanto uma coleção complexa de obras (uma temporada ou série) de forma unificada. Isso elimina a necessidade do código cliente fazer dezenas de validações if/else para saber com que tipo de dado está lidando.
+
+- `domain/obra.js` - A classe Obra atua como o Component do padrão, definindo o contrato padrão para todos os elementos da árvore, ela também estabelece métodos de estrutura estrutural como adicionarFilho, removerFilho e getFilhos. Por padrão (e visando a transparência do padrão), ela assume que o elemento é uma folha e lança um erro caso alguém tente adicionar um filho a ela. Também fornece métodos padronizados de cálculo, como getDuracaoTotal() e getContagemEpisodios().
+
+- `domain/Episodio.js` - O Episódio representa a Leaf (Folha) do Composite e é a menor unidade granular estrutural e não suporta a adição de filhos. É neste arquivo que a recursão matemática termina: o método getContagemEpisodios() devolve o valor exato de 1, já o método getDuracaoTotal() interrompe a busca e retorna o valor direto de this.runtime.
+
+- `domain/Serie.js` & `domain/Temporada.js`- Estas classes são os Composites reais, possuindo uma propriedade filhos (um array) para guardar outras obras internamente. O nó raiz (Serie.js) tem uma trava onde seu método adicionarFilho só aceita a entrada de objetos do tipo 'Temporada'. Por sua vez, o nó intermediário (Temporada.js) restringe a entrada apenas para 'Episódio'. E ao invés de guardarem a duração total estática no banco, ambas as classes implementam um método getDuracaoTotal() dinâmico que utiliza .reduce para iterar sobre seus filhos e somar a duração repassada por eles. Já o método setVisto(status) nessas classes pega a ordem de visualização e a propaga como um efeito cascata para todos os filhos iterando sobre this.filhos.
+
+- `domain/Factory.js` - É necessário um "montador" para que essa estrutura não fique solta na memória.A função montarArvoreCompositeSerie atua como o "Mestre de Obras" (Tree Builder), ela instancia os três níveis de classes (Série, Temporada, Episódio) traduzindo os dados puros da API  e utilizando os métodos do Composite, ela liga cada folha (Episódio) no nó intermediário correspondente (Temporada), e em seguida, pendura todos os nós intermediários na raiz (Série).
 
 
 
