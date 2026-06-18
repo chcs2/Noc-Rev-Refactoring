@@ -130,7 +130,7 @@ ___
 
 - `src/utils/useAppObserver.js` - Para conectar a classe tradicional EventNotifier ao ecossistema do React, foi criado o hook customizado useAppObserver. Ele utiliza o useEffect para gerenciar o ciclo de vida da inscrição e quando um componente que usa este hook é renderizado, ele chama appEvents.inscrever. O retorno do useEffect garante que appEvents.desinscrever seja chamado quando o componente for desmontado (fechado). Isso é crucial para evitar travamentos e vazamentos de memória (memory leaks) causados por tentativas de atualizar componentes que não estão mais na tela.
 
-- `src/main.jsx` - Para conectar a classe tradicional EventNotifier ao ecossistema do React, foi criado o hook customizado useAppObserver. Ele utiliza o useEffect para gerenciar o ciclo de vida da inscrição e quando um componente que usa este hook é renderizado, ele chama appEvents.inscrever. O retorno do useEffect garante que appEvents.desinscrever seja chamado quando o componente for desmontado (fechado). Isso é crucial para evitar travamentos e vazamentos de memória (memory leaks) causados por tentativas de atualizar componentes que não estão mais na tela.
+- `src/App.jsx` - A aplicação prática do desacoplamento pode ser vista no componente raiz. O componente <NotificadorGlobal/> é importado e posicionado logo no topo da hierarquia, fora do sistema de rotas (Routes), ele fica invisível e escutando as ações globais passivamente. Assim, independentemente da rota em que o usuário esteja, os eventos disparados pelo UserDataContext.jsx serão capturados e exibidos por este componente.
 
 
 
