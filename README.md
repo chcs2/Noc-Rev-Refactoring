@@ -95,18 +95,16 @@ ___
 
 - 
   O que é o padrão: O Prototype é um padrão de projeto criacional que permite copiar (clonar) objetos complexos sem que o código cliente precise depender de suas classes concretas ou conhecer seus detalhes internos.
-- 
-  Abaixo, detalhados os locais e como o padrão atua nas diferentes camadas do sistema:
 
-  `domain/obra.js` - A superclasse define a interface base de clonagem que é herdada por todos os tipos de obras, o mesmo foi implementado o método clone() que utiliza new this.constructor para garantir o polimorfismo na hora da cópia, o método também aplica o spread operator [...] para realizar a clonagem profunda (Deep Copy) dos arrays de generos, diretores e criadores, assegurando que o clone tenha vida própria na memória.
+- `domain/obra.js` - A superclasse define a interface base de clonagem que é herdada por todos os tipos de obras, o mesmo foi implementado o método clone() que utiliza new this.constructor para garantir o polimorfismo na hora da cópia, o método também aplica o spread operator [...] para realizar a clonagem profunda (Deep Copy) dos arrays de generos, diretores e criadores, assegurando que o clone tenha vida própria na memória.
 
-  `domain/factory.js` - Para recriar objetos complexos salvos no localStorage (que perdem seus métodos e viram texto), foi construído um registro de protótipos, assim como o objeto constante moldesPrototipo, que armazena uma instância limpa de cada classe (Filme, Série, Episódio, etc.) para servir de "molde de métodos". Já a função obraDeIndice utiliza Object.create(Object.getPrototypeOf(prototipoMolde)) para recriar a obra baseada no molde correto, eliminando a necessidade de switch/cases gigantes e mantendo o princípio de aberto/fechado (Open/Closed).
+- `domain/factory.js` - Para recriar objetos complexos salvos no localStorage (que perdem seus métodos e viram texto), foi construído um registro de protótipos, assim como o objeto constante moldesPrototipo, que armazena uma instância limpa de cada classe (Filme, Série, Episódio, etc.) para servir de "molde de métodos". Já a função obraDeIndice utiliza Object.create(Object.getPrototypeOf(prototipoMolde)) para recriar a obra baseada no molde correto, eliminando a necessidade de switch/cases gigantes e mantendo o princípio de aberto/fechado (Open/Closed).
 
-  `context/UserDataContext.jsx` - O contexto da aplicação atua como o "Cliente" do padrão Prototype. A função duplicarObraPersonalizada recebe uma obraOriginal genérica e invoca o método obraOriginal.clone(), e sem precisar saber a classe concreta da obra, o sistema pega o clone exato e altera apenas os atributos exclusivos dessa nova variante (como gerar um novo id e aplicar um novoTitulo) antes de salvá-lo no banco.
+- `context/UserDataContext.jsx` - O contexto da aplicação atua como o "Cliente" do padrão Prototype. A função duplicarObraPersonalizada recebe uma obraOriginal genérica e invoca o método obraOriginal.clone(), e sem precisar saber a classe concreta da obra, o sistema pega o clone exato e altera apenas os atributos exclusivos dessa nova variante (como gerar um novo id e aplicar um novoTitulo) antes de salvá-lo no banco.
 
-  `pages/Listas.jsx` - A função duplicarLista(listaPrototipo) gera uma cópia exata de uma lista do usuário, também foi feita a clonagem profunda ([...listaPrototipo.itens]) para garantir que as edições na cópia não afetem os itens da lista original.
+- `pages/Listas.jsx` - A função duplicarLista(listaPrototipo) gera uma cópia exata de uma lista do usuário, também foi feita a clonagem profunda ([...listaPrototipo.itens]) para garantir que as edições na cópia não afetem os itens da lista original.
 
-  `pages/Diario.jsx` - A função prepararNovaRevisao permite usar os dados de uma avaliação antiga (nota, curtida, resenha) como molde (protótipo) para preencher automaticamente o formulário de uma nova linha do tempo/visualização da mesma obra.
+- `pages/Diario.jsx` - A função prepararNovaRevisao permite usar os dados de uma avaliação antiga (nota, curtida, resenha) como molde (protótipo) para preencher automaticamente o formulário de uma nova linha do tempo/visualização da mesma obra.
 
 
 
