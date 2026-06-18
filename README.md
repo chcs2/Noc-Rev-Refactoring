@@ -121,4 +121,6 @@ ___
 
 - `context/UserDataContext.jsx` - O benefício prático desse padrão pode ser visto no momento em que o usuário interage com o sistema de progressos. Na função marcarSerieInteiraVista(serieArvore), o padrão brilha intensamente.  Em vez de fazer lógicas complexas de alteração individual, a função simplesmente chama serieArvore.setVisto(true) e deixa a árvore se auto-atualizar. Logo em seguida, o contexto executa a função local salvarRecursivo(obra), que verifica se a obra possui o método getFilhos para mergulhar na árvore e persistir todo o status atualizado no banco de dados sem precisar saber a profundidade real dos elementos.
 
+
+### Padrão Comportamental Observer 👁️
 ---
