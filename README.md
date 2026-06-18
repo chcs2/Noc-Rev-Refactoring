@@ -119,6 +119,6 @@ ___
 
 - `domain/Factory.js` - É necessário um "montador" para que essa estrutura não fique solta na memória.A função montarArvoreCompositeSerie atua como o "Mestre de Obras" (Tree Builder), ela instancia os três níveis de classes (Série, Temporada, Episódio) traduzindo os dados puros da API  e utilizando os métodos do Composite, ela liga cada folha (Episódio) no nó intermediário correspondente (Temporada), e em seguida, pendura todos os nós intermediários na raiz (Série).
 
-
+- `context/UserDataContext.jsx` - O benefício prático desse padrão pode ser visto no momento em que o usuário interage com o sistema de progressos. Na função marcarSerieInteiraVista(serieArvore), o padrão brilha intensamente.  Em vez de fazer lógicas complexas de alteração individual, a função simplesmente chama serieArvore.setVisto(true) e deixa a árvore se auto-atualizar. Logo em seguida, o contexto executa a função local salvarRecursivo(obra), que verifica se a obra possui o método getFilhos para mergulhar na árvore e persistir todo o status atualizado no banco de dados sem precisar saber a profundidade real dos elementos.
 
 ---
